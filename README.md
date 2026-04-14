@@ -2,6 +2,8 @@
 
 A comprehensive set of custom Home Assistant Lovelace cards for monitoring GE Profile appliances connected via the SmartHQ integration. This bundle includes cards for ovens, washers, and dryers — all with a consistent dark theme, blue LCD displays, and appliance-specific visualizations.
 
+![GE Appliances Card](https://raw.githubusercontent.com/ChrisCaho/ge-appliances-card/main/screenshot.png)
+
 ## Features
 
 ### GE Oven Card
