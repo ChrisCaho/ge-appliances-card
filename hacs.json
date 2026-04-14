@@ -1,6 +1,5 @@
 {
   "name": "GE Appliances Card",
   "render_readme": true,
-  "filename": "ge-appliances-card.js",
-  "version": "1.0.0"
+  "filename": "ge-appliances-card.js"
 }
