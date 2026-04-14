@@ -159,65 +159,70 @@ views:
             sheets: true
 ```
 
-## Entity Requirements
+## How Entity Discovery Works
 
-### Oven
+Each card only needs **one config value** — the card automatically discovers all related entities across multiple HA domains by swapping the domain prefix and appending suffixes. **No manual sensor configuration is required.** If a derived entity does not exist, the corresponding field gracefully shows "--" or hides.
 
-The oven card requires a `water_heater` entity. The following related entities are used automatically when present:
+### The Naming Rule
 
-| Entity | Description |
-|--------|-------------|
-| `water_heater.<id>` | Main oven entity (required) |
-| `sensor.<id>_cook_time_remaining` | Cook timer countdown in seconds |
-| `sensor.<id>_kitchen_timer` | Kitchen timer countdown in seconds |
-| `sensor.<id>_probe_display_temp` | Meat probe temperature in degrees F |
-| `select.<id>_light` | Oven interior light control |
+All SmartHQ entities for a given appliance share a common **base name**. The card takes your configured entity/prefix, extracts that base name, and uses it to find entities in `sensor.*`, `binary_sensor.*`, and `select.*` domains.
 
-The oven card reads `operation_mode`, `current_temperature`, `temperature`, `display_temperature`, `display_state`, `probe_present`, `min_temp`, and `max_temp` from the `water_heater` entity attributes.
+For example, if your oven entity is `water_heater.hasvr1_ge_top_oven`, the base name is `hasvr1_ge_top_oven`. The card looks for `sensor.hasvr1_ge_top_oven_cook_time_remaining`, `select.hasvr1_ge_top_oven_light`, etc.
 
-### Washer
+For washer/dryer, if your prefix is `sensor.hasvr1_ge_washer_laundry`, the card looks for `sensor.hasvr1_ge_washer_laundry_machine_state`, `binary_sensor.hasvr1_ge_washer_laundry_door`, etc.
 
-All washer entities share the common prefix. The card reads the following suffixes:
+### Oven (entity → sensor, select)
 
-| Suffix | Type | Description |
-|--------|------|-------------|
-| `_machine_state` | sensor | Overall machine state (Off, Running, etc.) |
-| `_cycle` | sensor | Current cycle name |
-| `_sub_cycle` | sensor | Current sub-cycle (Wash, Rinse, Spin, etc.) |
-| `_time_remaining` | sensor | Time remaining in seconds |
-| `_delay_time_remaining` | sensor | Delay start time remaining in seconds |
-| `_washer_washtemp_level` | sensor | Wash temperature selection |
-| `_washer_spintime_level` | sensor | Spin speed selection |
-| `_washer_soil_level` | sensor | Soil level selection |
-| `_washer_rinse_option` | sensor | Rinse option selection |
-| `_washer_smart_dispense_loads_left` | sensor | Smart dispense loads remaining |
-| `_washer_smart_dispense_tank_status` | sensor | Smart dispense tank status |
-| `_door` | binary_sensor | Door open state |
-| `_washer_door_lock` | binary_sensor | Door lock state |
-| `_washer_prewash` | binary_sensor | Pre-wash active |
-| `_remote_status` | binary_sensor | Remote start ready |
+The oven card reads attributes directly from the `water_heater` entity (`operation_mode`, `current_temperature`, `temperature`, `display_temperature`, `display_state`, `probe_present`, `min_temp`, `max_temp`), and derives companion entities by domain swap + suffix:
 
-### Dryer
+| Domain Swap | Suffix | Full Entity ID Example | Used For |
+|-------------|--------|------------------------|----------|
+| `sensor.` | `_cook_time_remaining` | `sensor.hasvr1_ge_top_oven_cook_time_remaining` | Cook timer on LCD and attribute grid |
+| `sensor.` | `_kitchen_timer` | `sensor.hasvr1_ge_top_oven_kitchen_timer` | Kitchen timer on LCD and attribute grid |
+| `sensor.` | `_probe_display_temp` | `sensor.hasvr1_ge_top_oven_probe_display_temp` | Meat probe temperature on LCD and attribute grid |
+| `sensor.` | `_cook_mode` | `sensor.hasvr1_ge_top_oven_cook_mode` | Full cook mode description (e.g. "Bake (350°F) (Delayed Start)") |
+| `select.` | `_light` | `select.hasvr1_ge_top_oven_light` | Oven light indicator inside LCD display |
 
-All dryer entities share the common prefix. The card reads the following suffixes:
+The oven card also reads the `delay_time_remaining` attribute from the `water_heater` entity to detect and display delayed start countdowns on the LCD.
 
-| Suffix | Type | Description |
-|--------|------|-------------|
-| `_machine_state` | sensor | Overall machine state |
-| `_cycle` | sensor | Current cycle name |
-| `_sub_cycle` | sensor | Current sub-cycle |
-| `_time_remaining` | sensor | Time remaining in seconds |
-| `_delay_time_remaining` | sensor | Delay start time remaining in seconds |
-| `_dryer_temperaturenew_option` | sensor | Heat level selection |
-| `_dryer_drynessnew_level` | sensor | Dryness level selection |
-| `_dryer_ecodry_option_selection` | sensor | Eco Dry setting |
-| `_dryer_extended_tumble_option_selection` | sensor | Extended Tumble setting |
-| `_dryer_sheet_inventory` | sensor | Dryer sheet count remaining |
-| `_dryer_sheet_usage_configuration` | sensor | Sheet usage configuration |
-| `_dryer_tumble_status` | sensor | Tumble status |
-| `_door` | binary_sensor | Door open state |
-| `_dryer_blocked_vent_fault` | binary_sensor | Blocked vent fault |
-| `_dryer_washerlink_status` | binary_sensor | WasherLink paired status |
+### Washer (prefix → sensor, binary_sensor)
+
+| Domain | Suffix | Description |
+|--------|--------|-------------|
+| `sensor.` | `_machine_state` | Overall machine state (Off, Running, etc.) |
+| `sensor.` | `_cycle` | Current cycle name |
+| `sensor.` | `_sub_cycle` | Current sub-cycle (Wash, Rinse, Spin, etc.) |
+| `sensor.` | `_time_remaining` | Time remaining in seconds |
+| `sensor.` | `_delay_time_remaining` | Delay start time remaining in seconds |
+| `sensor.` | `_washer_washtemp_level` | Wash temperature selection |
+| `sensor.` | `_washer_spintime_level` | Spin speed selection |
+| `sensor.` | `_washer_soil_level` | Soil level selection |
+| `sensor.` | `_washer_rinse_option` | Rinse option selection |
+| `sensor.` | `_washer_smart_dispense_loads_left` | Smart dispense loads remaining |
+| `sensor.` | `_washer_smart_dispense_tank_status` | Smart dispense tank status |
+| `binary_sensor.` | `_door` | Door open state |
+| `binary_sensor.` | `_washer_door_lock` | Door lock state |
+| `binary_sensor.` | `_washer_prewash` | Pre-wash active |
+
+### Dryer (prefix → sensor, binary_sensor)
+
+| Domain | Suffix | Description |
+|--------|--------|-------------|
+| `sensor.` | `_machine_state` | Overall machine state |
+| `sensor.` | `_cycle` | Current cycle name |
+| `sensor.` | `_sub_cycle` | Current sub-cycle |
+| `sensor.` | `_time_remaining` | Time remaining in seconds |
+| `sensor.` | `_delay_time_remaining` | Delay start time remaining in seconds |
+| `sensor.` | `_dryer_temperaturenew_option` | Heat level selection |
+| `sensor.` | `_dryer_drynessnew_level` | Dryness level selection |
+| `sensor.` | `_dryer_ecodry_option_selection` | Eco Dry setting |
+| `sensor.` | `_dryer_extended_tumble_option_selection` | Extended Tumble setting |
+| `sensor.` | `_dryer_sheet_inventory` | Dryer sheet count remaining |
+| `sensor.` | `_dryer_sheet_usage_configuration` | Sheet usage configuration |
+| `sensor.` | `_dryer_tumble_status` | Tumble status |
+| `binary_sensor.` | `_door` | Door open state |
+| `binary_sensor.` | `_dryer_blocked_vent_fault` | Blocked vent fault |
+| `binary_sensor.` | `_dryer_washerlink_status` | WasherLink paired status |
 
 ## Notification Automations
 
