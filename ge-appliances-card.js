@@ -1,26 +1,16 @@
 /**
- * GE Appliances Card - Bundle v1.0.0
+ * GE Appliances Card - Bundle v1.1.0
  *
  * A comprehensive set of custom Home Assistant Lovelace cards for GE Profile
  * appliances connected via the SmartHQ integration.
  *
- * Includes:
- *   - GE Oven Card v2.1.0    (ge-oven-card)
- *   - GE Washer Card v1.2.0  (ge-washer-card)
- *   - GE Dryer Card v1.5.0   (ge-dryer-card)
- *
- * Repository: https://github.com/ChrisCaho/ge-appliances-card
- * License: Unlicense (public domain)
+ * Includes: ge-oven-card, ge-washer-card, ge-dryer-card
  */
-
-const GE_APPLIANCES_CARD_VERSION = '1.0.0';
+const GE_APPLIANCES_CARD_VERSION = '1.1.0';
 console.log(`GE Appliances Card Bundle v${GE_APPLIANCES_CARD_VERSION}: loading...`);
 
-// =============================================================================
-// GE OVEN CARD v2.1.0
-// =============================================================================
-
-const GE_OVEN_CARD_VERSION = '2.1.0';
+const GE_OVEN_CARD_VERSION = '2.2.0';
+console.log(`GE Oven Card v${GE_OVEN_CARD_VERSION}: loading...`);
 
 class GeOvenCard extends HTMLElement {
   constructor() {
@@ -211,23 +201,17 @@ class GeOvenCard extends HTMLElement {
         }
         .temp-range {
           font-size: 10px;
-          color: #666;
+          color: #888;
           letter-spacing: 0.5px;
         }
-        .top-right {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-        }
         .oven-light {
-          font-size: 16px;
-          opacity: 0.3;
-          transition: all 0.3s ease;
-        }
-        .oven-light.on {
-          opacity: 1;
-          color: #ffdd44;
-          text-shadow: 0 0 8px rgba(255, 221, 68, 0.6);
+          position: absolute;
+          top: 8px;
+          right: 12px;
+          font-size: 18px;
+          color: #ffcc33;
+          text-shadow: 0 0 10px rgba(255, 200, 50, 0.7), 0 0 20px rgba(255, 180, 30, 0.4);
+          z-index: 2;
         }
 
         /* === LCD DISPLAY === */
@@ -476,15 +460,13 @@ class GeOvenCard extends HTMLElement {
           <div class="top-bar">
             <span class="brand">GE Profile</span>
             <span class="temp-range">${minTemp}°–${maxTemp}°</span>
-            <div class="top-right">
-              <span class="oven-light ${lightOn ? 'on' : ''}" title="Oven Light${lightOn ? ': On' : ''}">💡</span>
-              <span class="oven-name">${friendlyName}</span>
-            </div>
+            <span class="oven-name">${friendlyName}</span>
           </div>
 
           <!-- LCD Display -->
           <div class="lcd-bezel">
             <div class="lcd-screen ${isActive ? 'active' : ''}">
+              ${lightOn ? '<span class="oven-light">💡</span>' : ''}
               <div class="lcd-row main">
                 <div>
                   <span class="lcd-temp ${isActive ? '' : 'off'}">${lcdTemp}</span>
@@ -562,10 +544,6 @@ window.customCards.push({
 });
 
 console.log(`GE Oven Card v${GE_OVEN_CARD_VERSION}: registered.`);
-
-// =============================================================================
-// GE WASHER CARD v1.2.0
-// =============================================================================
 
 const GE_WASHER_CARD_VERSION = '1.2.0';
 console.log(`GE Washer Card v${GE_WASHER_CARD_VERSION}: loading...`);
@@ -1017,10 +995,6 @@ window.customCards.push({
 });
 console.log(`GE Washer Card v${GE_WASHER_CARD_VERSION}: registered.`);
 
-// =============================================================================
-// GE DRYER CARD v1.5.0
-// =============================================================================
-
 const GE_DRYER_CARD_VERSION = '1.5.0';
 console.log(`GE Dryer Card v${GE_DRYER_CARD_VERSION}: loading...`);
 
@@ -1443,16 +1417,4 @@ window.customCards.push({
 });
 console.log(`GE Dryer Card v${GE_DRYER_CARD_VERSION}: registered.`);
 
-// =============================================================================
-// BUNDLE REGISTRATION
-// =============================================================================
-
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: 'ge-appliances-card',
-  name: 'GE Appliances Card (Bundle)',
-  description: 'Bundle of GE Oven, Washer, and Dryer cards for SmartHQ appliances',
-  preview: false,
-});
-
-console.log(`GE Appliances Card Bundle v${GE_APPLIANCES_CARD_VERSION}: registered (oven v${GE_OVEN_CARD_VERSION}, washer v${GE_WASHER_CARD_VERSION}, dryer v${GE_DRYER_CARD_VERSION}).`);
+console.log(`GE Appliances Card Bundle v${GE_APPLIANCES_CARD_VERSION}: all cards registered.`);
