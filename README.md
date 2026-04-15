@@ -1,5 +1,9 @@
 # GE Appliances Card
 
+[![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg)](https://github.com/hacs/integration)
+[![License: Unlicense](https://img.shields.io/badge/license-Unlicense-blue.svg)](https://unlicense.org)
+[![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=ChrisCaho&repository=ge-appliances-card&category=plugin)
+
 A comprehensive set of custom Home Assistant Lovelace cards for monitoring GE Profile appliances connected via the SmartHQ integration. This bundle includes cards for ovens, washers, and dryers — all with a consistent dark theme, blue LCD displays, and appliance-specific visualizations.
 
 ![GE Oven Card — Bake Mode](ge-oven-card-bake.jpg)
