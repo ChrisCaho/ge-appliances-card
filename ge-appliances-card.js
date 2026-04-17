@@ -1,15 +1,15 @@
 /**
- * GE Appliances Card - Bundle v1.11.0
+ * GE Appliances Card - Bundle v1.13.0
  *
  * A comprehensive set of custom Home Assistant Lovelace cards for GE Profile
  * appliances connected via the SmartHQ integration.
  *
- * Includes: GE Oven Card v2.10.0, GE Washer Card v1.4.1, GE Dryer Card v1.6.1
+ * Includes: GE Oven Card v2.12.0, GE Washer Card v1.5.0, GE Dryer Card v1.7.0
  *
  * https://github.com/ChrisCaho/ge-appliances-card
  */
 
-const GE_OVEN_CARD_VERSION = '2.10.0';
+const GE_OVEN_CARD_VERSION = '2.12.0';
 console.log(`GE Oven Card v${GE_OVEN_CARD_VERSION}: loading...`);
 
 class GeOvenCard extends HTMLElement {
@@ -25,6 +25,8 @@ class GeOvenCard extends HTMLElement {
     this._lastMode = null;        // for change detection
     this._targetChangedAt = 0;    // timestamp of last target change
     this._modeChangedAt = 0;      // timestamp of last mode change
+    this._lastElapsed = null;     // cache last non-zero elapsed value (flicker workaround)
+    this._lastElapsedTime = 0;    // timestamp of last valid elapsed value
   }
 
   setConfig(config) {
@@ -70,15 +72,7 @@ class GeOvenCard extends HTMLElement {
 
   _formatTime(seconds) {
     const s = parseFloat(seconds);
-    if (!s || s <= 0) return null;
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    return h > 0 ? `${h}h ${m}m` : `${m}m`;
-  }
-
-  _formatElapsed(seconds) {
-    const s = parseFloat(seconds);
-    if (!s || s <= 0) return null;
+    if (!s || s <= 0) return '--';
     const h = Math.floor(s / 3600);
     const m = Math.floor((s % 3600) / 60);
     return h > 0 ? `${h}h ${m}m` : `${m}m`;
@@ -186,12 +180,25 @@ class GeOvenCard extends HTMLElement {
     const cookTimeRaw = this._getSensor('cook_time_remaining');
     const kitchenTimerRaw = this._getSensor('kitchen_timer');
     const probeTemp = this._getSensor('probe_display_temp');
-    const cookTimeElapsedRaw = this._getSensor('cooking_elapsed');
 
     const cookTime = this._formatTime(cookTimeRaw);
+    const cookTimeActive = cookTime !== '--';
     const kitchenTimer = this._formatTime(kitchenTimerRaw);
+    const kitchenTimerActive = kitchenTimer !== '--';
     const probeTempVal = probeTemp ? parseFloat(probeTemp) : 0;
-    const elapsed = this._formatElapsed(cookTimeElapsedRaw);
+
+    // Elapsed from water_heater attribute (flickers — cache last non-zero)
+    const elapsedAttr = attrs.cook_time_elapsed;
+    let elapsed = null;
+    if (elapsedAttr && elapsedAttr !== '0' && elapsedAttr !== '0:00') {
+      elapsed = elapsedAttr;
+      this._lastElapsed = elapsed;
+      this._lastElapsedTime = Date.now();
+    } else if (!isOff && this._lastElapsed && (Date.now() - this._lastElapsedTime) < 30000) {
+      elapsed = this._lastElapsed;
+    } else {
+      this._lastElapsed = null;
+    }
 
     const isBogus = (v) => v == null || v === 0 || v === 100 || v === '100';
     const realDisplayTemp = isBogus(displayTemp) ? null : displayTemp;
@@ -201,9 +208,9 @@ class GeOvenCard extends HTMLElement {
     let lcdRight = '';
     if (isDelay && targetTemp) {
       lcdRight = `SET ${targetTemp}°`;
-    } else if (cookTime) {
+    } else if (cookTimeActive) {
       lcdRight = `COOK ${cookTime}`;
-    } else if (kitchenTimer) {
+    } else if (kitchenTimerActive) {
       lcdRight = `TIMER ${kitchenTimer}`;
     } else if (isActive && targetTemp) {
       lcdRight = `SET ${targetTemp}°`;
@@ -244,7 +251,8 @@ class GeOvenCard extends HTMLElement {
     const rawTemp = attrs.raw_temperature;
     const rawTempNum = rawTemp != null ? parseFloat(rawTemp) : 0;
     const targetTempNum = targetTemp != null ? parseFloat(targetTemp) : 0;
-    const overshootWarning = !isOff && rawTempNum > 0 && targetTempNum > 0 && rawTempNum > targetTempNum + 30;
+    const isPreheat = displayState.toLowerCase().includes('preheat');
+    const overshootWarning = !isOff && !isPreheat && rawTempNum > 0 && targetTempNum > 0 && rawTempNum > targetTempNum + 30;
     const hotRestart = displayState.toLowerCase().includes('preheat') && rawTempNum > 200;
 
     return {
@@ -258,12 +266,11 @@ class GeOvenCard extends HTMLElement {
       hasTopElement: modeInfo.topElement,
       currentFormatted: fmtTemp(currentTemp),
       targetFormatted: targetTemp != null ? `${targetTemp}°F` : '--',
-      rawFormatted: fmtTemp(rawTemp),
       rawTemp: rawTempNum, targetTemp: targetTempNum,
       overshootWarning, hotRestart, resolvedMode,
       probeDisplay, probeClass,
-      cookTime: cookTime || '--', cookTimeActive: !!cookTime,
-      kitchenTimer: kitchenTimer || '--', kitchenTimerActive: !!kitchenTimer,
+      cookTime, cookTimeActive,
+      kitchenTimer, kitchenTimerActive,
       elapsed: elapsed || '--', elapsedActive: !!elapsed,
       minTemp: attrs.min_temp, maxTemp: attrs.max_temp,
     };
@@ -456,7 +463,7 @@ class GeOvenCard extends HTMLElement {
           0% { transform: translateY(0); opacity: 0; }
           3% { opacity: 0.9; }
           35% { opacity: 0.6; }
-          100% { transform: translateY(-120px); opacity: 0; }
+          100% { transform: translateY(-${windowHeight}px); opacity: 0; }
         }
         .wave-rise.r1 { left: 15%; animation-delay: 0s; }
         .wave-rise.r2 { left: 35%; animation-delay: 1.4s; }
@@ -482,7 +489,7 @@ class GeOvenCard extends HTMLElement {
           0% { transform: translateY(0); opacity: 0; }
           3% { opacity: 0.9; }
           35% { opacity: 0.6; }
-          100% { transform: translateY(120px); opacity: 0; }
+          100% { transform: translateY(${windowHeight}px); opacity: 0; }
         }
         .wave-fall.f1 { left: 20%; animation-delay: 0.4s; }
         .wave-fall.f2 { left: 40%; animation-delay: 1.8s; }
@@ -576,6 +583,17 @@ class GeOvenCard extends HTMLElement {
           display: flex; justify-content: space-between; align-items: center;
         }
         .entity-id { font-size: 9px; color: #444; font-family: monospace; }
+
+        /* Accessibility: reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .heat-element.on, .fan-blades, .wave-rise, .wave-fall,
+          .conv-wave, .overshoot-icon.visible, .hot-restart-badge.visible {
+            animation: none !important;
+          }
+          .heat-element.on { opacity: 0.6; }
+          .fan-blades { transform: rotate(45deg); }
+          .glow-ring.active, .overshoot-icon.visible, .hot-restart-badge.visible { opacity: 0.8; }
+        }
       </style>
 
       <ha-card>
@@ -653,11 +671,7 @@ class GeOvenCard extends HTMLElement {
             <div class="attr-panel">
               <div class="attr-item">
                 <span class="attr-label">Current</span>
-                <span class="attr-value" data-field="attrCurrent"></span>
-              </div>
-              <div class="attr-item">
-                <span class="attr-label">Raw</span>
-                <span><span class="attr-value" data-field="attrRaw"></span><span class="overshoot-icon" data-field="overshootIcon" title="Raw temp exceeds target by 30°F+">⚠</span></span>
+                <span><span class="attr-value" data-field="attrCurrent"></span><span class="overshoot-icon" data-field="overshootIcon" title="Raw temp exceeds target by 30°F+">⚠</span></span>
               </div>
               <div class="attr-item">
                 <span class="attr-label">Target</span>
@@ -694,7 +708,7 @@ class GeOvenCard extends HTMLElement {
 
   // Get a data-field element
   _el(field) {
-    return this.shadowRoot.querySelector(`[data-field="${field}"]`);
+    return this.shadowRoot?.querySelector(`[data-field="${field}"]`);
   }
 
   // Update DOM in-place without replacing innerHTML (preserves animations)
@@ -743,7 +757,11 @@ class GeOvenCard extends HTMLElement {
     const now = Date.now();
     const riseEl = this._el('riseIndicator');
     if (data.isActive && data.rawTemp > 0) {
-      this._prevRawTemps.push({ temp: data.rawTemp, time: now });
+      // Only push if temperature changed or >5s elapsed (avoid duplicate entries)
+      const lastEntry = this._prevRawTemps[this._prevRawTemps.length - 1];
+      if (!lastEntry || lastEntry.temp !== data.rawTemp || now - lastEntry.time > 5000) {
+        this._prevRawTemps.push({ temp: data.rawTemp, time: now });
+      }
       // Keep only last 60s
       this._prevRawTemps = this._prevRawTemps.filter(e => now - e.time < 60000);
       const oldest = this._prevRawTemps[0];
@@ -824,11 +842,7 @@ class GeOvenCard extends HTMLElement {
     // Attributes
     const attrCurrent = this._el('attrCurrent');
     attrCurrent.textContent = data.currentFormatted;
-    attrCurrent.className = `attr-value ${data.isEngaged ? 'highlight' : ''}`;
-
-    const attrRaw = this._el('attrRaw');
-    attrRaw.textContent = data.rawFormatted;
-    attrRaw.className = `attr-value ${data.overshootWarning ? 'overshoot' : (data.isEngaged ? 'highlight' : '')}`;
+    attrCurrent.className = `attr-value ${data.overshootWarning ? 'overshoot' : (data.isEngaged ? 'highlight' : '')}`;
 
     const overshootIcon = this._el('overshootIcon');
     overshootIcon.className = `overshoot-icon ${data.overshootWarning ? 'visible' : ''}`;
@@ -869,7 +883,7 @@ window.customCards.push({
 
 console.log(`GE Oven Card v${GE_OVEN_CARD_VERSION}: registered.`);
 
-const GE_WASHER_CARD_VERSION = '1.4.1';
+const GE_WASHER_CARD_VERSION = '1.5.0';
 console.log(`GE Washer Card v${GE_WASHER_CARD_VERSION}: loading...`);
 
 class GeWasherCard extends HTMLElement {
@@ -955,7 +969,9 @@ class GeWasherCard extends HTMLElement {
     const doorLocked = this._getBinary('washer_door_lock') === 'on';
     const prewash = this._getBinary('washer_prewash') === 'on';
 
-    const isActive = machineState.toLowerCase() !== 'off';
+    const msLower = machineState.toLowerCase();
+    const isActive = !['off', 'unavailable', 'unknown'].includes(msLower);
+    const isDone = msLower.includes('end') || msLower.includes('complete');
     const isDelay = delayRemaining && parseFloat(delayRemaining) > 0;
     const isSpin = subCycle.toLowerCase().includes('spin');
     const isRinse = subCycle.toLowerCase().includes('rinse');
@@ -984,7 +1000,7 @@ class GeWasherCard extends HTMLElement {
     let lcdSubText = isActive ? (subCycle !== '---' ? subCycle : machineState) : machineState;
 
     return {
-      isActive, isDelay, isSpin, isRinse, isFill, isLocked,
+      isActive, isDone, isDelay, isSpin, isRinse, isFill, isLocked,
       doorOpen, prewash,
       tc,
       drumClass, agitatorClass,
@@ -1252,6 +1268,15 @@ class GeWasherCard extends HTMLElement {
         .sensor-value.highlight { color: var(--tc-color); }
         .sensor-value.warn { color: #ff9944; }
 
+        /* DONE badge */
+        .lcd-done {
+          font-family: 'Courier New', monospace; font-size: 14px; font-weight: 700;
+          color: #4caf50; text-shadow: 0 0 8px rgba(76,175,80,0.6);
+          letter-spacing: 2px; display: none;
+        }
+        .lcd-done.visible { display: inline; animation: donePulse 2s ease-in-out infinite; }
+        @keyframes donePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
         /* Footer */
         .footer {
           margin-top: 4px; padding: 4px 4px 0;
@@ -1259,6 +1284,21 @@ class GeWasherCard extends HTMLElement {
           display: flex; justify-content: space-between; align-items: center;
         }
         .entity-id { font-size: 9px; color: #444; font-family: monospace; }
+
+        /* Responsive drum for narrow viewports */
+        @media (max-width: 360px) {
+          .drum-container { width: min(200px, 55vw); height: min(200px, 55vw); }
+        }
+
+        /* Accessibility: reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .drum-inner.spinning, .agitator.spinning, .agitator.agitating,
+          .glow-ring.active, .fill-icon, .water-level.active, .lcd-done.visible {
+            animation: none !important;
+          }
+          .drum-inner.spinning { transform: translate(-50%, -50%) rotate(45deg); }
+          .glow-ring.active { opacity: 0.8; }
+        }
       </style>
 
       <ha-card>
@@ -1277,6 +1317,7 @@ class GeWasherCard extends HTMLElement {
               <div class="lcd-row">
                 <span class="lcd-sub" data-field="lcdSub"></span>
                 <span>
+                  <span class="lcd-done" data-field="lcdDone">DONE</span>
                   <span class="lcd-badge" data-field="lcdPrewash"></span>
                   <span class="lcd-state" data-field="lcdState"></span>
                 </span>
@@ -1389,6 +1430,7 @@ class GeWasherCard extends HTMLElement {
     lcdSub.textContent = d.lcdSubText;
     lcdSub.className = `lcd-sub ${d.isActive ? '' : 'off'}`;
 
+    this._el('lcdDone').className = `lcd-done ${d.isDone ? 'visible' : ''}`;
     this._el('lcdPrewash').textContent = d.prewash ? 'PRE ' : '';
     const lcdState = this._el('lcdState');
     lcdState.textContent = d.isActive ? d.washTemp : '';
@@ -1452,7 +1494,7 @@ window.customCards.push({
 });
 console.log(`GE Washer Card v${GE_WASHER_CARD_VERSION}: registered.`);
 
-const GE_DRYER_CARD_VERSION = '1.6.1';
+const GE_DRYER_CARD_VERSION = '1.7.0';
 console.log(`GE Dryer Card v${GE_DRYER_CARD_VERSION}: loading...`);
 
 class GeDryerCard extends HTMLElement {
@@ -1544,7 +1586,9 @@ class GeDryerCard extends HTMLElement {
     const ventBlocked = this._getBinary('dryer_blocked_vent_fault') === 'on';
     const washerLink = this._getBinary('dryer_washerlink_status') === 'on';
 
-    const isActive = machineState.toLowerCase() !== 'off';
+    const msLower = machineState.toLowerCase();
+    const isActive = !['off', 'unavailable', 'unknown'].includes(msLower);
+    const isDone = msLower.includes('end') || msLower.includes('complete');
     const isDelay = delayRemaining && parseFloat(delayRemaining) > 0;
     const isSteam = cycle.toLowerCase().includes('steam') || subCycle.toLowerCase().includes('steam');
     const tc = this._tempColor(tempOption);
@@ -1576,7 +1620,7 @@ class GeDryerCard extends HTMLElement {
     }
 
     return {
-      isActive, isDelay, isSteam, tc, doorOpen, ventBlocked,
+      isActive, isDone, isDelay, isSteam, tc, doorOpen, ventBlocked,
       lcdCycle, lcdTime, lcdSub, tempOption,
       drynessLevel,
       ecoDryOn, extTumbleOn, tumbleOn, isSteamLabel: isSteam,
@@ -1790,6 +1834,15 @@ class GeDryerCard extends HTMLElement {
         .sensor-value { font-size: 11px; font-weight: 500; color: #e0e0e0; }
         .sensor-value.highlight { color: var(--dryer-tc-color, #555); }
 
+        /* DONE badge */
+        .lcd-done {
+          font-family: 'Courier New', monospace; font-size: 14px; font-weight: 700;
+          color: #4caf50; text-shadow: 0 0 8px rgba(76,175,80,0.6);
+          letter-spacing: 2px; display: none;
+        }
+        .lcd-done.visible { display: inline; animation: donePulse 2s ease-in-out infinite; }
+        @keyframes donePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+
         /* Footer */
         .footer {
           margin-top: 4px; padding: 4px 4px 0;
@@ -1797,6 +1850,21 @@ class GeDryerCard extends HTMLElement {
           display: flex; justify-content: space-between; align-items: center;
         }
         .entity-id { font-size: 9px; color: #444; font-family: monospace; }
+
+        /* Responsive drum for narrow viewports */
+        @media (max-width: 360px) {
+          .drum-container { width: min(200px, 55vw); height: min(200px, 55vw); }
+        }
+
+        /* Accessibility: reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .drum-inner.spinning, .glow-ring.active, .steam-wisp,
+          .vent-warning, .lcd-done.visible {
+            animation: none !important;
+          }
+          .drum-inner.spinning { transform: rotate(45deg); }
+          .glow-ring.active { opacity: 0.8; }
+        }
       </style>
 
       <ha-card>
@@ -1814,7 +1882,10 @@ class GeDryerCard extends HTMLElement {
               </div>
               <div class="lcd-row">
                 <span class="lcd-sub" data-field="lcdSub"></span>
-                <span class="lcd-state" data-field="lcdState"></span>
+                <span>
+                  <span class="lcd-done" data-field="lcdDone">DONE</span>
+                  <span class="lcd-state" data-field="lcdState"></span>
+                </span>
               </div>
             </div>
           </div>
@@ -1893,12 +1964,12 @@ class GeDryerCard extends HTMLElement {
   _update() {
     if (!this._hass || !this._config) return;
 
-    const data = this._getDisplayData();
-
     // Build DOM on first render
     if (!this._rendered) {
       this._buildDom();
     }
+
+    const data = this._getDisplayData();
 
     // Set the dynamic color as a CSS custom property on the host
     const card = this.shadowRoot.querySelector('ha-card');
@@ -1928,6 +1999,9 @@ class GeDryerCard extends HTMLElement {
     const lcdState = this._el('lcdState');
     lcdState.textContent = data.isActive ? data.tempOption : '';
     lcdState.style.display = data.isActive ? '' : 'none';
+
+    // DONE badge
+    this._el('lcdDone').className = `lcd-done ${data.isDone ? 'visible' : ''}`;
 
     // Vent warning
     this._el('ventWarning').className = `vent-warning ${data.ventBlocked ? 'visible' : ''}`;
